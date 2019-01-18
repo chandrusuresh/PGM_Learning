@@ -23,8 +23,12 @@ function allAcc = LRSearchLambdaSGD(Xtrain, Ytrain, Xvalidation, Yvalidation, la
   
   %%%%%%%%%%%%%%
   %%% Student code
-
-
+  maxAccuracy = 0.0;
+  for i = 1:length(lambdas)
+    thetaOpt = LRTrainSGD(Xtrain, Ytrain, lambdas(i));
+    predict = LRPredict(Xvalidation,thetaOpt);
+    allAcc(i) = LRAccuracy(Yvalidation,predict);
+  end
   %%%%%%%%%%%  
  
 end 
