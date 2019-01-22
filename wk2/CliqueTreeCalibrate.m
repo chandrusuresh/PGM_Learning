@@ -98,46 +98,57 @@ function [P, logZ] = CliqueTreeCalibrate(P, isMax)
 
     end
 
-%    keyboard
+%%    keyboard
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % If doLogZ is set, you need to use the unnormalizedMessages to compute
     % logZ, the log of the partition function.
     if (doLogZ)
         %%% YOUR CODE HERE:
-        logZ = 0; % remove this
-        allVars = [];
-        allCard = [];
-        for i = 1:N
-          allVars = [allVars,P.cliqueList(i).var];
-          allCard = [allCard,P.cliqueList(i).card];
-        end
-        [uniqueVars,I] = unique(allVars);
-        uniqueCard = allCard(I);
-        assgn = IndexToAssignment(1:prod(uniqueCard),uniqueCard);
-        idx = cell(N,1);
-        for j = 1:N
-          idx_temp = [];
-          for k = 1:length(P.cliqueList(j).var)
-            idx_temp(k) = find(uniqueVars == P.cliqueList(j).var(k));
+        mu = 1;
+        for i = 1:size(P.edges,1)
+          ind = find(P.edges(i,i:end) == 1);
+          for j = 1:length(ind)
+            mu = mu.*unnormalizedMessages(i,ind(j)).val.*unnormalizedMessages(ind(j),i).val;
           end
-          idx{j} = idx_temp;
         end
-        for i = 1:size(assgn,1)
-          Z = 1.0;
-          A = assgn(i,:);
-          for j = 1:N
-            cliqueA = A(idx{j});
-            idx1 = AssignmentToIndex(cliqueA,P.cliqueList(j).card);
-            Z = Z*P.cliqueList(j).val(idx1);
-          end
-%          [Z,log(Z)]
-          logZ = logZ + Z;
-        end
-        logZ = log(logZ);
+        logZ = log(sum(mu));
+          
+            
+        %%% Brute Force method
+%        logZ = 0; % remove this
+%        allVars = [];
+%        allCard = [];
+%        for i = 1:N
+%          allVars = [allVars,P.cliqueList(i).var];
+%          allCard = [allCard,P.cliqueList(i).card];
+%        end
+%        [uniqueVars,I] = unique(allVars);
+%        uniqueCard = allCard(I);
+%        assgn = IndexToAssignment(1:prod(uniqueCard),uniqueCard);
+%        idx = cell(N,1);
+%        for j = 1:N
+%          idx_temp = [];
+%          for k = 1:length(P.cliqueList(j).var)
+%            idx_temp(k) = find(uniqueVars == P.cliqueList(j).var(k));
+%          end
+%          idx{j} = idx_temp;
+%        end
+%        for i = 1:size(assgn,1)
+%          Z = 1.0;
+%          A = assgn(i,:);
+%          for j = 1:N
+%            cliqueA = A(idx{j});
+%            idx1 = AssignmentToIndex(cliqueA,P.cliqueList(j).card);
+%            Z = Z*P.cliqueList(j).val(idx1);
+%          end
+%%          [Z,log(Z)]
+%          logZ = logZ + Z;
+%        end
+%        logZ = log(logZ);
     else
         logZ = 0;
     end
-%    keyboard
+%   keyboard
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     % Iterate through the incoming messages, multiply them by the initial
