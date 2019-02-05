@@ -60,6 +60,57 @@ function [nll, grad] = InstanceNegLogLikelihood(X, y, theta, modelParams)
     grad = zeros(size(theta));
     %%%
     % Your code here:
+    % % % Weighted Feature Counts
+    wfc = 0;
+    for i = 1:length(featureSet.features)
+        if y(featureSet.features(i).var) == featureSet.features(i).assignment
+            wfc = wfc + theta(featureSet.features(i).paramIdx);
+        end
+    end
     
-
+    % % % Regularization cost
+    rc = modelParams.lambda/2*(sum(theta.^2));
+    
+    % % % Clique Tree
+    cliqueTree = struct();
+    cliqueTree.edges = [0,1;1,0];
+    
+    % % % Get independent factors
+    indpFactors = [struct('var',[1],'card',[26],'val',zeros(1,26)),...
+                   struct('var',[2],'card',[26],'val',zeros(1,26)),...
+                   struct('var',[3],'card',[26],'val',zeros(1,26))];
+    
+    for i = 1:length(featureSet.features)
+        if length(featureSet.features(i).var) == 1
+            varNum = featureSet.features(i).var;
+            valNum = featureSet.features(i).assignment;
+            paramIdx = featureSet.features(i).paramIdx;
+            indpFactors(varNum).val(valNum) = indpFactors(varNum).val(valNum)+theta(paramIdx);
+        end
+    end
+    
+    depFactors = [struct('var',[1,2],'card',[26,26],'val',zeros(1,26*26)),...
+                  struct('var',[2,3],'card',[26,26],'val',zeros(1,26*26))];
+    for i = 1:length(featureSet.features)
+        if length(featureSet.features(i).var) ~= 1
+            if prod(featureSet.features(i).var == [1,2])
+                varNum = 1;
+            elseif prod(featureSet.features(i).var == [2,3])
+                varNum = 2;
+            else
+                continue;
+            end
+            valNum = AssignmentToIndex(featureSet.features(i).assignment,depFactors(varNum).card);
+            depFactors(varNum).val(valNum) = exp(theta(featureSet.features(i).paramIdx) + ...
+                indpFactors(depFactors(varNum).var(1)).val(featureSet.features(i).assignment(1)) + ...
+                indpFactors(depFactors(varNum).var(2)).val(featureSet.features(i).assignment(2)));
+        end
+    end
+    cliqueTree.cliqueList = depFactors;
+    [calibratedCTree, logZ] = CliqueTreeCalibrate(cliqueTree, false);
+    
+    nll = logZ - wfc + rc;
+        
+    
+    
 end
