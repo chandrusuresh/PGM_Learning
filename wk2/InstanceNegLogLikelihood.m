@@ -101,16 +101,16 @@ function [nll, grad] = InstanceNegLogLikelihood(X, y, theta, modelParams)
                 continue;
             end
             valNum = AssignmentToIndex(featureSet.features(i).assignment,depFactors(varNum).card);
-            depFactors(varNum).val(valNum) = exp(theta(featureSet.features(i).paramIdx) + ...
-                indpFactors(depFactors(varNum).var(1)).val(featureSet.features(i).assignment(1)) + ...
-                indpFactors(depFactors(varNum).var(2)).val(featureSet.features(i).assignment(2)));
+            val = theta(featureSet.features(i).paramIdx) + ...
+                indpFactors(depFactors(varNum).var(2)).val(featureSet.features(i).assignment(2));
+            if varNum == 1
+                val = val + ...
+                    indpFactors(depFactors(varNum).var(1)).val(featureSet.features(i).assignment(1));
+            end
+            depFactors(varNum).val(valNum) = exp(val); 
         end
     end
     cliqueTree.cliqueList = depFactors;
     [calibratedCTree, logZ] = CliqueTreeCalibrate(cliqueTree, false);
-    
     nll = logZ - wfc + rc;
-        
-    
-    
 end
