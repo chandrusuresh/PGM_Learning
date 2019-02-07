@@ -62,35 +62,43 @@ function [nll, grad] = InstanceNegLogLikelihood(X, y, theta, modelParams)
     % Your code here:
     % % % Weighted Feature Counts
     wfc = 0;
+    grad_wfc = zeros(1,length(theta));
     for i = 1:length(featureSet.features)
         if y(featureSet.features(i).var) == featureSet.features(i).assignment
             wfc = wfc + theta(featureSet.features(i).paramIdx);
+            grad_wfc(featureSet.features(i).paramIdx) = 1;
         end
     end
     
     % % % Regularization cost
     rc = modelParams.lambda/2*(sum(theta.^2));
+    grad_rc = modelParams.lambda*theta;
     
     % % % Clique Tree
     cliqueTree = struct();
     cliqueTree.edges = [0,1;1,0];
     
     % % % Get independent factors
-    indpFactors = [struct('var',[1],'card',[26],'val',zeros(1,26)),...
-                   struct('var',[2],'card',[26],'val',zeros(1,26)),...
-                   struct('var',[3],'card',[26],'val',zeros(1,26))];
-    
+    indpFactors = [struct('var',[1],'card',[26],'val',zeros(1,26),'idx',[]),...
+                   struct('var',[2],'card',[26],'val',zeros(1,26),'idx',[]),...
+                   struct('var',[3],'card',[26],'val',zeros(1,26),'idx',[])];
+    indpFactors(1).idx = cell(1,26);
+    indpFactors(2).idx = cell(1,26);
+    indpFactors(3).idx = cell(1,26);               
+               
     for i = 1:length(featureSet.features)
         if length(featureSet.features(i).var) == 1
             varNum = featureSet.features(i).var;
             valNum = featureSet.features(i).assignment;
             paramIdx = featureSet.features(i).paramIdx;
             indpFactors(varNum).val(valNum) = indpFactors(varNum).val(valNum)+theta(paramIdx);
+            indpFactors(varNum).idx{valNum} = [indpFactors(varNum).idx{valNum},paramIdx];
         end
     end
     
     depFactors = [struct('var',[1,2],'card',[26,26],'val',zeros(1,26*26)),...
                   struct('var',[2,3],'card',[26,26],'val',zeros(1,26*26))];
+    depFactors_idx = cell(1,2);
     for i = 1:length(featureSet.features)
         if length(featureSet.features(i).var) ~= 1
             if prod(featureSet.features(i).var == [1,2])
@@ -107,10 +115,45 @@ function [nll, grad] = InstanceNegLogLikelihood(X, y, theta, modelParams)
                 val = val + ...
                     indpFactors(depFactors(varNum).var(1)).val(featureSet.features(i).assignment(1));
             end
-            depFactors(varNum).val(valNum) = exp(val); 
+            depFactors(varNum).val(valNum) = exp(val);
+            depFactors_idx{varNum}(valNum) = featureSet.features(i).paramIdx;
         end
     end
     cliqueTree.cliqueList = depFactors;
     [calibratedCTree, logZ] = CliqueTreeCalibrate(cliqueTree, false);
+    % % % Normalize calibrated clique tree
+    calibratedCTree_norm = calibratedCTree;
+    calibratedCTree_norm.cliqueList(1).val = calibratedCTree_norm.cliqueList(1).val/sum(calibratedCTree_norm.cliqueList(1).val);
+    calibratedCTree_norm.cliqueList(2).val = calibratedCTree_norm.cliqueList(2).val/sum(calibratedCTree_norm.cliqueList(2).val);
+    
+    % % % Individual Probabilities
+    P{1} = FactorMarginalization(calibratedCTree_norm.cliqueList(1),[2]);
+    P{2} = FactorMarginalization(calibratedCTree_norm.cliqueList(1),[1]);
+    P2_2 = FactorMarginalization(calibratedCTree_norm.cliqueList(2),[3]);
+    P{3} = FactorMarginalization(calibratedCTree_norm.cliqueList(2),[2]);
+    
+    % % Check if P2_1 = P2_2 because calibration is supposed to ensure
+    % % this!
+    P2_val = sum(P{2}.val-P2_2.val);
+    assert(P2_val <= 1E-10);
+    
+    grad_factor = zeros(1,length(theta));
+    
+    for i = 1:length(indpFactors)
+        for j = 1:length(indpFactors(i).idx)
+            grad_factor(indpFactors(i).idx{j}) = grad_factor(indpFactors(i).idx{j}) + ...
+                P{i}.val(j);
+        end
+    end
+    for i = 1:length(depFactors_idx)
+        for j = 1:length(depFactors_idx{i})
+            grad_factor(depFactors_idx{i}(j)) = grad_factor(depFactors_idx{i}(j)) + ...
+                calibratedCTree_norm.cliqueList(i).val(j);
+        end
+    end    
+    
     nll = logZ - wfc + rc;
+
+    % % % Gradient computation
+    grad = grad_factor - grad_wfc + grad_rc;
 end
