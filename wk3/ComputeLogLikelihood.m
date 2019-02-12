@@ -31,7 +31,12 @@ loglikelihood = 0;
 for i = 1:size(dataset,1)
     prob = 0.0;
     for j = 1:length(P.c)
-        pc = ComputeProbability_Obs_given_class(P,G,dataset(i,:,:),j);
+        if length(size(G)) == 3
+            G1 = reshape(G(:,:,j),[size(G,1),size(G,2)]);
+        else
+            G1 = G;
+        end
+        pc = ComputeProbability_Obs_given_class(P,G1,dataset(i,:,:),j);
         prob = prob + exp(log(P.c(j)) + pc);
     end
     loglikelihood = loglikelihood + log(prob);
