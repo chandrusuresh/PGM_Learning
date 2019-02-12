@@ -20,6 +20,14 @@ W = zeros(10,10);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 % YOUR CODE HERE        
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
+for i = 1:size(dataset,2)
+    for j = 1:size(dataset,2)
+        xdata = reshape(dataset(:,i,:),size(dataset,1),size(dataset,3));
+        ydata = reshape(dataset(:,j,:),size(dataset,1),size(dataset,3));
+        W(i,j) = GaussianMutualInformation(xdata,ydata);
+        W(j,i) = W(i,j);
+    end
+end
 
 % Compute maximum spanning tree
 A = MaxSpanningTree(W);
