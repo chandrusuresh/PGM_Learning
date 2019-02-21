@@ -50,7 +50,25 @@ for iter=1:maxIter
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   % YOUR CODE HERE
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  
+  for k = 1:K
+    P.c(k) = mean(ClassProb(:,k));
+    for i = 1:size(G,1)
+      if G(i,1) == 0
+          [P.clg(i).mu_y(k),P.clg(i).sigma_y(k)] = FitG(poseData(:,i,1),ClassProb(:,k));
+          [P.clg(i).mu_x(k),P.clg(i).sigma_x(k)] = FitG(poseData(:,i,2),ClassProb(:,k));
+          [P.clg(i).mu_angle(k),P.clg(i).sigma_angle(k)] = FitG(poseData(:,i,3),ClassProb(:,k));
+      else
+          parent_data = reshape(poseData(:,G(i,2),:),[size(poseData,1),size(poseData,3)]);
+          class_data = reshape(poseData(:,i,:),[size(poseData,1),size(poseData,3)]);
+          [theta1,P.clg(i).sigma_y(k)] = FitLG(class_data(:,1),parent_data,ClassProb(:,k));
+          [theta2,P.clg(i).sigma_x(k)] = FitLG(class_data(:,2),parent_data,ClassProb(:,k));
+          [theta3,P.clg(i).sigma_angle(k)] = FitLG(class_data(:,3),parent_data,ClassProb(:,k));
+          P.clg(i).theta(k,1:4) = [theta1(4),theta1(1:3)'];
+          P.clg(i).theta(k,5:8) = [theta2(4),theta2(1:3)'];
+          P.clg(i).theta(k,9:12) = [theta3(4),theta3(1:3)'];
+      end
+    end
+  end
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   
   % E-STEP to re-estimate ClassProb using the new parameters
@@ -74,18 +92,32 @@ for iter=1:maxIter
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   % YOUR CODE HERE
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  
+  currDir = cd;
+  altDir = '../wk3/';
+  prob = zeros(size(ClassProb));
+  TotalProb = zeros(size(poseData,1),1);
+  for i = 1:size(poseData,1)
+      cd(altDir);
+      for class = 1:K
+        prob(i,class) = log(P.c(class)) + ComputeProbability_Obs_given_class(P,G,poseData(i,:,:),class);
+      end
+      cd(currDir);
+      TotalProb(i) = logsumexp(prob(i,:));
+  end
+  ClassProb = exp(prob - TotalProb);
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   
   % Compute log likelihood of dataset for this iteration
   % Hint: You should use the logsumexp() function here
-  loglikelihood(iter) = 0;
+  loglikelihood(iter) = 0.0;
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   % YOUR CODE HERE
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  
+  cd(altDir);
+  loglikelihood(iter) = ComputeLogLikelihood(P, G, poseData);
+  cd(currDir);
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  
+
   % Print out loglikelihood
   disp(sprintf('EM iteration %d: log likelihood: %f', ...
     iter, loglikelihood(iter)));
