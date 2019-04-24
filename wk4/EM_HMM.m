@@ -2,7 +2,7 @@
 %
 % Copyright (C) Daphne Koller, Stanford Univerity, 2012
 
-function [P loglikelihood ClassProb PairProb] = EM_HMM(actionData, poseData, G, InitialClassProb, InitialPairProb, maxIter)
+function [P, loglikelihood ClassProb PairProb] = EM_HMM(actionData, poseData, G, InitialClassProb, InitialPairProb, maxIter)
 
 % INPUTS
 % actionData: structure holding the actions as described in the PA
@@ -100,7 +100,7 @@ for iter=1:maxIter
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   TM = sum(PairProb,1);
   
-  P.transMatrix = P.transMatrix + reshape(TM,[3,3]);
+  P.transMatrix = P.transMatrix + reshape(TM,[K,K]);
   P.transMatrix = P.transMatrix./sum(P.transMatrix,2);
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -142,43 +142,46 @@ for iter=1:maxIter
       numStates = length(actionData(i).marg_ind);
       CTree = [struct('var',[1],'card',[K],...
                         'val',log(P.c) + logEmissionProb(actionData(i).marg_ind(1),:))];
+      pc2 = CTree(1).val;
       for j = 2:numStates
           CTree(j) = struct('var',[j,j-1],'card',[K,K],...
                         'val',zeros(1,K*K));
-          val = CTree(j).val;
+          val = CTree(j).val;      
           for k1 = 1:K
               st = (k1-1)*K + 1;
               ed = k1*K;
               val(st:ed) = log(P.transMatrix(k1,:)) + logEmissionProb(actionData(i).marg_ind(j),:);
+              pc2(k1) = pc2(k1) + logsumexp(val(st:ed));
           end
           CTree(j).val = val;
       end
       [M, PCalibrated] = ComputeExactMarginalsHMM(CTree);
-      
       for j = 1:length(M)
-        ClassProb(actionData(i).marg_ind(j),:) = exp(M(j).val);
-        if j > 1
-            pairProb1 = PCalibrated.cliqueList(j-1).val - logsumexp(PCalibrated.cliqueList(j-1).val);
-            PairProb(actionData(i).pair_ind(j-1),:) = exp(pairProb1);
-        end
+          ClassProb(actionData(i).marg_ind(j),:) = exp(M(j).val);
+          if j > 1
+              pairProb1 = PCalibrated.cliqueList(j-1).val - logsumexp(PCalibrated.cliqueList(j-1).val);
+              PairProb(actionData(i).pair_ind(j-1),:) = exp(pairProb1);
+          end
+          cd(currDir);
       end
-      pc1 = zeros(1,K);
-      for ii = 1:length(M)
-          pc1 = pc1 + M(ii).val;
-      end
-      pc(i) = logsumexp(pc1);
-      CTree = [];
+%     ll = ComputeLogLikelihood(P,poseData(actionData(i).marg_ind,:,:),...
+%         logEmissionProb(actionData(i).marg_ind,:));
+%     S1 = FactorMarginalization(PCalibrated.cliqueList(1),[2]);
+    loglikelihood(iter)  = loglikelihood(iter) + logsumexp(PCalibrated.cliqueList(1).val) + length(actionData(i).pair_ind);
+    CTree = [];
   end
-  keyboard
+%   keyboard
+%   loglikelihood(iter) = sum(pc);% + size(PairProb,1);
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  
+%   LL = ComputeLogLikelihood(actionData,logEmissionProb,ClassProb,PairProb);
   % Print out loglikelihood
-  disp(sprintf('EM iteration %d: log likelihood: %f', ...
-    iter, loglikelihood(iter)));
-  if exist('OCTAVE_VERSION')
-    fflush(stdout);
+  if maxIter > 1
+      disp(sprintf('EM iteration %d: log likelihood: %f', ...
+        iter, loglikelihood(iter)));
+      if exist('OCTAVE_VERSION')
+        fflush(stdout);
+      end
   end
-  
   % Check for overfitting by decreasing loglikelihood
   if iter > 1
     if loglikelihood(iter) < loglikelihood(iter-1)

@@ -28,7 +28,7 @@ P.edges = zeros(numNodes);
 for i = 1:numNodes
     P.cliqueList(i).var = [i i+1];
     P.cliqueList(i).card = [card card];
-    P.cliqueList(i).val = ones(1, card * card);
+    P.cliqueList(i).val = zeros(1, card * card);
     
     if (i > 1)
         P.edges(i, i-1) = 1;

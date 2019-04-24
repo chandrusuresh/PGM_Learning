@@ -20,7 +20,24 @@ function [accuracy, predicted_labels] = RecognizeActions(datasetTrain, datasetTe
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % YOUR CODE HERE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+defStruct = struct();
+defStruct.P = struct();
+defStruct.ClassProb = 0;
+defStruct.PairProb = 0;
+defStruct.loglikelihood = 0;
+classData = [defStruct;defStruct;defStruct];
+for i = 1:length(datasetTrain)
+    actionData = datasetTrain(i).actionData;
+    poseData = datasetTrain(i).poseData;
+    InitialClassProb = datasetTrain(i).InitialClassProb;
+    InitialPairProb = datasetTrain(i).InitialPairProb;
+    [P, loglikelihood,ClassProb,PairProb] = EM_HMM(actionData, poseData, G, InitialClassProb, InitialPairProb, maxIter);
+    classData(i).P = P;
+    classData(i).ClassProb = ClassProb;
+    classData(i).PairProb = PairProb;
+    classData(i).loglikelihood = loglikelihood;
+    clearvars P ClassProb PairProb loglikehood;
+end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -35,5 +52,18 @@ predicted_labels = [];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % YOUR CODE HERE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+for j = 1:length(datasetTest.actionData)
+    actionData = datasetTest.actionData(j);
+    poseData = datasetTest.poseData(actionData.marg_ind,:,:);
+    actionData.marg_ind = 1:length(actionData.marg_ind);
+    actionData.pair_ind = 1:length(actionData.marg_ind)-1;
+    for i = 1:length(classData)
+        loglikelihood(i) = ComputeLogLikelihood(actionData,poseData,classData(i),G,size(classData(i).ClassProb,2));
+    end
+    predicted_labels(j) = find(loglikelihood == max(loglikelihood));
+end
+diff_labels = datasetTest.labels - predicted_labels';
+accuracy = length(find(diff_labels == 0))/length(datasetTest.labels);
+predicted_labels = predicted_labels';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
